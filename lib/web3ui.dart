@@ -871,6 +871,20 @@ realBalance = realBalance - 1.1;
                             color: Colors.white,
                           ),
                         ),
+                        Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            fetchWalletBalance();
+                          },
+                          child: Text(
+                            'Refresh',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -931,6 +945,14 @@ realBalance = realBalance - 1.1;
       child: Column(
         children: [
           // Spins remaining indicator
+          Text(_status ?? '',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 1),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
