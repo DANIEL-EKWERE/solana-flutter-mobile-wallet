@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:solanaclaim/Example_app.dart';
 import 'package:solanaclaim/example_app1.dart';
 import 'package:solanaclaim/home_screen.dart';
-import 'package:solanaclaim/phantom_wallet_widget.dart';
+import 'package:solanaclaim/web3ui.dart';
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,12 +17,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const WorkshopHomePage(),
+      home:  MainScreen(),   //WorkshopHomePage(),
     );
   }
 }
