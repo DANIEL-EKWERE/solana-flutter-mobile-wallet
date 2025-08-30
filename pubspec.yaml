@@ -43,6 +43,8 @@ dependencies:
   solana_mobile_client: ^0.1.2
   solana_wallet_adapter: ^0.1.5
   bs58: ^1.0.2
+  flutter_launcher_icons: ^0.14.4
+  launcher_name: ^1.0.2
 
 dev_dependencies:
   flutter_test:
@@ -101,3 +103,41 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+launcher_name:
+  default: "Solana Claim"
+
+flutter_launcher_icons:
+  image_path: "assets/images/1024.png"
+  android:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
+  linux:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
+  ios:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
+    remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
+  windows:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/1024.png"
+    background_color: "#004694"
+    theme_color: "#004694"
